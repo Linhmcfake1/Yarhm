@@ -1,0 +1,212 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+
+-- Tạo GUI và nút Toggle
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "ToolGui"
+screenGui.Parent = playerGui
+
+local toggleButton = Instance.new("TextButton")
+toggleButton.Size = UDim2.new(0.2, 0, 0.1, 0)
+toggleButton.Position = UDim2.new(0.4, 0, 0.45, 0)  -- Đặt ở giữa màn hình
+toggleButton.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+toggleButton.Text = "Toggle ON"
+toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleButton.Parent = screenGui
+
+local dragging = false
+local dragInput, mousePos, framePos
+
+local isScriptActive = true
+local isScriptRunning = false
+local connection
+local handleKillConnection
+local playerCharacter
+
+-- Hàm kiểm tra xem người chơi có phải là bạn bè không
+local function isFriend(targetPlayer)
+    return player:IsFriendsWith(targetPlayer.UserId)
+end
+
+-- Hàm handlekill để xử lý việc tiêu diệt tất cả người chơi khác, trừ bạn bè
+local function handlekill()
+    if not firetouchinterest then
+        warn('Incompatible Exploit', 'Your exploit does not support this command (missing firetouchinterest)')
+        return
+    end
+
+    local Tool = playerCharacter:FindFirstChildWhichIsA("Tool")
+    local Handle = Tool and Tool:FindFirstChild("Handle")
+
+    if not Tool or not Handle then
+        warn("Handle Kill", "You need to hold a \"Tool\" that does damage on touch. For example, the default \"Sword\" tool.")
+        return
+    end
+
+    local playersToProcess = {}
+    for _, targetPlayer in ipairs(Players:GetPlayers()) do
+        if targetPlayer ~= player and not isFriend(targetPlayer) then
+            table.insert(playersToProcess, targetPlayer)
+        end
+    end
+
+    for _, targetPlayer in ipairs(playersToProcess) do
+        task.spawn(function()
+            while isScriptActive and Tool and playerCharacter and targetPlayer.Character and Tool.Parent == playerCharacter do
+                local targetHumanoid = targetPlayer.Character:FindFirstChildWhichIsA("Humanoid")
+                if not targetHumanoid or targetHumanoid.Health <= 0 or not targetPlayer.Character.Parent then
+                    break
+                end
+                for _, part in ipairs(targetPlayer.Character:GetChildren()) do
+                    if part:IsA("BasePart") then
+                        pcall(function()
+                            firetouchinterest(Handle, part, 1)
+                            task.wait()
+                            firetouchinterest(Handle, part, 0)
+                        end)
+                    end
+                end
+                task.wait(0.1)
+            end
+        end)
+    end
+end
+
+-- Hàm di chuyển nhân vật đến vị trí chỉ định và thực hiện các hành động khác
+local function startSequence()
+    local character = playerCharacter
+    local rootPart = character:WaitForChild("HumanoidRootPart")
+
+    -- Bước 1: Dịch chuyển đến vị trí chỉ định
+    rootPart.CFrame = CFrame.new(-81.55941772460938, 17633.498046875, 9045.537109375)
+    wait(2)
+
+    -- Bước 2: Di chuyển lên độ cao lớn và bắt đầu xoay
+    local newHeight = 9999999999999
+    rootPart.CFrame = CFrame.new(rootPart.Position.X, newHeight, rootPart.Position.Z)
+
+    -- Tạo một mặt phẳng lớn phía dưới toàn bộ bản đồ để ngăn không cho nhân vật rơi vào void
+    local Workspace = game:GetService("Workspace")
+    local basePart = Instance.new("Part")
+    basePart.Size = Vector3.new(100000, 1, 100000) -- Kích thước lớn để bao phủ toàn bộ bản đồ
+    basePart.Position = Vector3.new(0, newHeight - 10000, 0) -- Đặt dưới toàn bộ bản đồ
+    basePart.Anchored = true -- Cố định vị trí của mặt phẳng
+    basePart.Transparency = 1 -- Vô hình
+    basePart.CanCollide = true -- Cho phép va chạm để giữ nhân vật không rơi xuống
+    basePart.Parent = Workspace
+
+    -- Xoay quanh tọa độ cũ
+    local originalPosition = rootPart.Position
+    local orbitRadius = 5000000000000000
+    local orbitTime = 20
+    local orbitSpeed = (2 * math.pi) / orbitTime
+    local startTime = tick()
+
+    -- Tắt trọng lực cho nhân vật để đảm bảo không rơi
+    character:WaitForChild("Humanoid").PlatformStand = true
+
+    local function getNewPosition(t)
+        local angle = orbitSpeed * t
+        local x = originalPosition.X + orbitRadius * math.cos(angle)
+        local z = originalPosition.Z + orbitRadius * math.sin(angle)
+        return Vector3.new(x, originalPosition.Y, z)
+    end
+
+    -- Kết nối với Heartbeat để liên tục di chuyển nhân vật
+    connection = RunService.Heartbeat:Connect(function()
+        if not playerCharacter or not playerCharacter.Parent then
+            connection:Disconnect()
+            return
+        end
+
+        local elapsedTime = tick() - startTime
+        local newPosition = getNewPosition(elapsedTime)
+        rootPart.CFrame = CFrame.new(newPosition.X, originalPosition.Y, newPosition.Z)
+    end)
+
+    -- Bước 3: Thực hiện handlekill liên tục
+    handleKillConnection = RunService.Heartbeat:Connect(function()
+        if isScriptActive then
+            handlekill()
+        end
+    end)
+end
+
+-- Hàm khởi tạo lại script khi nhân vật hồi sinh
+local function init()
+    if isScriptRunning then
+        -- Nếu script đang chạy, thì dừng nó
+        isScriptActive = false
+        wait(2) -- Đợi một chút để chắc chắn script đã dừng hoàn toàn
+        if connection then connection:Disconnect() end
+        if handleKillConnection then handleKillConnection:Disconnect() end
+    end
+    playerCharacter = player.Character or player.CharacterAdded:Wait()
+    isScriptActive = true
+    startSequence()
+    isScriptRunning = true
+end
+
+-- Theo dõi sự kiện khi nhân vật hồi sinh và khởi động lại script
+Players.LocalPlayer.CharacterAdded:Connect(function()
+    -- Đợi nhân vật hồi sinh hoàn toàn
+    wait(2)
+    init()
+end)
+
+-- Bắt đầu chạy script ngay lập tức
+init()
+
+-- Sự kiện khi nhấn nút toggle
+local function toggleScript()
+    if isScriptActive then
+        -- Tắt script
+        isScriptActive = false
+        toggleButton.Text = "Toggle OFF"
+        -- Ngắt kết nối handlekill nếu đang chạy
+        if handleKillConnection then
+            handleKillConnection:Disconnect()
+        end
+        if connection then
+            connection:Disconnect()
+        end
+    else
+        -- Bật lại script
+        isScriptActive = true
+        toggleButton.Text = "Toggle ON"
+        init()
+    end
+end
+
+-- Kết nối sự kiện chạm để điều khiển nút toggle
+toggleButton.MouseButton1Click:Connect(toggleScript)
+
+-- Thêm tính năng kéo nút
+toggleButton.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        mousePos = input.Position
+        framePos = toggleButton.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+toggleButton.InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
+        local delta = input.Position - mousePos
+        toggleButton.Position = UDim2.new(
+            framePos.X.Scale,
+            framePos.X.Offset + delta.X,
+            framePos.Y.Scale,
+            framePos.Y.Offset + delta.Y
+        )
+    end
+end)
