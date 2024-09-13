@@ -1,0 +1,123 @@
+-- Tạo giao diện người dùng (UI) mới
+local ScreenGui = Instance.new("ScreenGui")
+local Frame = Instance.new("Frame")
+local CountdownLabel = Instance.new("TextLabel")
+local StopButton = Instance.new("TextButton")
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+
+-- Khởi tạo các biến
+local Number = 0
+local SomeSRVS = {}
+local countdown = 50
+local stop = false
+local dragging = false
+local dragInput, mousePos, framePos
+
+-- Đặt ScreenGui vào PlayerGui
+ScreenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+
+-- Cấu hình Frame
+Frame.Parent = ScreenGui
+Frame.BackgroundColor3 = Color3.new(0.1, 0.1, 0.1) -- Màu nền xám đen
+Frame.BackgroundTransparency = 0.5 -- Đặt độ trong suốt của Frame
+Frame.Size = UDim2.new(0, 300, 0, 100)
+Frame.Position = UDim2.new(0.5, -150, 0.5, -50)
+Frame.AnchorPoint = Vector2.new(0.5, 0.5)
+Frame.Active = true
+Frame.Draggable = true -- Cho phép kéo thả khung
+
+-- Cấu hình CountdownLabel
+CountdownLabel.Parent = Frame
+CountdownLabel.Size = UDim2.new(1, 0, 0.5, 0)
+CountdownLabel.Position = UDim2.new(0, 0, 0, 0)
+CountdownLabel.Text = "Countdown: 50 seconds"
+CountdownLabel.TextColor3 = Color3.new(1, 1, 1)
+CountdownLabel.BackgroundTransparency = 1
+CountdownLabel.Font = Enum.Font.SourceSans
+CountdownLabel.TextSize = 24
+
+-- Cấu hình StopButton
+StopButton.Parent = Frame
+StopButton.Size = UDim2.new(1, 0, 0.5, 0)
+StopButton.Position = UDim2.new(0, 0, 0.5, 0)
+StopButton.Text = "Stop"
+StopButton.TextColor3 = Color3.new(1, 1, 1)
+StopButton.BackgroundColor3 = Color3.new(1, 0, 0)
+StopButton.BackgroundTransparency = 0.3
+StopButton.Font = Enum.Font.SourceSans
+StopButton.TextSize = 24
+
+-- Định nghĩa hàm để dừng script
+StopButton.MouseButton1Click:Connect(function()
+    stop = true
+    ScreenGui:Destroy()
+    print("Script has been cancelled.")
+end)
+
+-- Kéo thả Frame
+Frame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        mousePos = input.Position
+        framePos = Frame.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+Frame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+game:GetService("UserInputService").InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - mousePos
+        Frame.Position = UDim2.new(framePos.X.Scale, framePos.X.Offset + delta.X, framePos.Y.Scale, framePos.Y.Offset + delta.Y)
+    end
+end)
+
+-- Hàm đếm ngược
+local function startCountdown()
+    while countdown > 0 and not stop do
+        CountdownLabel.Text = "Countdown: " .. countdown .. " seconds"
+        wait(1)
+        countdown = countdown - 1
+    end
+    if not stop then
+        executeScript() -- Thực thi hàm đổi server sau khi đếm ngược xong
+    end
+end
+
+-- Hàm đổi server
+function executeScript()
+    -- Gửi yêu cầu HTTP để lấy danh sách server
+    local response = game:HttpGetAsync("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")
+    local data = HttpService:JSONDecode(response).data
+
+    -- Duyệt qua danh sách server để tìm server phù hợp
+    for _, v in ipairs(data) do
+        if type(v) == "table" and v.maxPlayers > v.playing and v.id ~= game.JobId then
+            if v.playing > Number then
+                Number = v.playing
+                SomeSRVS[1] = v.id
+            end
+        end
+    end
+
+    -- Kiểm tra và chuyển đến server được chọn
+    if #SomeSRVS > 0 then
+        print("Best suitable server: " .. SomeSRVS[1])
+        TeleportService:TeleportToPlaceInstance(game.PlaceId, SomeSRVS[1], game.Players.LocalPlayer)
+    else
+        print("No suitable server found.")
+    end
+end
+
+-- Bắt đầu đếm ngược
+startCountdown()
