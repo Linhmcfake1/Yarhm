@@ -24,56 +24,11 @@ local dragInput, mousePos, framePos
 local isScriptActive = true
 local isScriptRunning = false
 local connection
-local handleKillConnection
 local playerCharacter
 
 -- Hàm kiểm tra xem người chơi có phải là bạn bè không
 local function isFriend(targetPlayer)
     return player:IsFriendsWith(targetPlayer.UserId)
-end
-
--- Hàm handlekill để xử lý việc tiêu diệt tất cả người chơi khác, trừ bạn bè
-local function handlekill()
-    if not firetouchinterest then
-        warn('Incompatible Exploit', 'Your exploit does not support this command (missing firetouchinterest)')
-        return
-    end
-
-    local Tool = playerCharacter:FindFirstChildWhichIsA("Tool")
-    local Handle = Tool and Tool:FindFirstChild("Handle")
-
-    if not Tool or not Handle then
-        warn("Handle Kill", "You need to hold a \"Tool\" that does damage on touch. For example, the default \"Sword\" tool.")
-        return
-    end
-
-    local playersToProcess = {}
-    for _, targetPlayer in ipairs(Players:GetPlayers()) do
-        if targetPlayer ~= player and not isFriend(targetPlayer) then
-            table.insert(playersToProcess, targetPlayer)
-        end
-    end
-
-    for _, targetPlayer in ipairs(playersToProcess) do
-        task.spawn(function()
-            while isScriptActive and Tool and playerCharacter and targetPlayer.Character and Tool.Parent == playerCharacter do
-                local targetHumanoid = targetPlayer.Character:FindFirstChildWhichIsA("Humanoid")
-                if not targetHumanoid or targetHumanoid.Health <= 0 or not targetPlayer.Character.Parent then
-                    break
-                end
-                for _, part in ipairs(targetPlayer.Character:GetChildren()) do
-                    if part:IsA("BasePart") then
-                        pcall(function()
-                            firetouchinterest(Handle, part, 1)
-                            task.wait()
-                            firetouchinterest(Handle, part, 0)
-                        end)
-                    end
-                end
-                task.wait(0.1)
-            end
-        end)
-    end
 end
 
 -- Hàm di chuyển nhân vật đến vị trí chỉ định và thực hiện các hành động khác
@@ -86,7 +41,7 @@ local function startSequence()
     wait(2)
 
     -- Bước 2: Di chuyển lên độ cao lớn và bắt đầu xoay
-    local newHeight = 9999999999999
+    local newHeight = 2000
     rootPart.CFrame = CFrame.new(rootPart.Position.X, newHeight, rootPart.Position.Z)
 
     -- Tạo một mặt phẳng lớn phía dưới toàn bộ bản đồ để ngăn không cho nhân vật rơi vào void
@@ -101,7 +56,7 @@ local function startSequence()
 
     -- Xoay quanh tọa độ cũ
     local originalPosition = rootPart.Position
-    local orbitRadius = 5000000000000000
+    local orbitRadius = 100
     local orbitTime = 20
     local orbitSpeed = (2 * math.pi) / orbitTime
     local startTime = tick()
@@ -127,13 +82,6 @@ local function startSequence()
         local newPosition = getNewPosition(elapsedTime)
         rootPart.CFrame = CFrame.new(newPosition.X, originalPosition.Y, newPosition.Z)
     end)
-
-    -- Bước 3: Thực hiện handlekill liên tục
-    handleKillConnection = RunService.Heartbeat:Connect(function()
-        if isScriptActive then
-            handlekill()
-        end
-    end)
 end
 
 -- Hàm khởi tạo lại script khi nhân vật hồi sinh
@@ -143,7 +91,6 @@ local function init()
         isScriptActive = false
         wait(2) -- Đợi một chút để chắc chắn script đã dừng hoàn toàn
         if connection then connection:Disconnect() end
-        if handleKillConnection then handleKillConnection:Disconnect() end
     end
     playerCharacter = player.Character or player.CharacterAdded:Wait()
     isScriptActive = true
@@ -167,10 +114,6 @@ local function toggleScript()
         -- Tắt script
         isScriptActive = false
         toggleButton.Text = "Toggle OFF"
-        -- Ngắt kết nối handlekill nếu đang chạy
-        if handleKillConnection then
-            handleKillConnection:Disconnect()
-        end
         if connection then
             connection:Disconnect()
         end
@@ -208,5 +151,45 @@ toggleButton.InputChanged:Connect(function(input)
             framePos.Y.Scale,
             framePos.Y.Offset + delta.Y
         )
+    end
+end)
+-- Tự động cbring tất cả người chơi trừ bạn khi execute
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local bringc -- Biến để giữ kết nối RenderStepped
+
+-- Hàm để ngắt kết nối nếu đã có một kết nối đang chạy
+local function disconnectBring()
+    if bringc then
+        bringc:Disconnect()
+        bringc = nil
+    end
+end
+
+-- Hàm để di chuyển tất cả người chơi khác đến vị trí của bạn
+local function bringOthersToMe()
+    -- Ngắt kết nối cũ nếu có
+    disconnectBring()
+    
+    -- Kết nối RenderStepped để di chuyển liên tục
+    bringc = RunService.RenderStepped:Connect(function()
+        for _, target in pairs(Players:GetChildren()) do
+            -- Loại trừ chính bạn khỏi danh sách
+            if target ~= LocalPlayer and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+                -- Di chuyển họ đến vị trí của bạn, cách bạn 5 đơn vị
+                target.Character.HumanoidRootPart.CFrame = LocalPlayer.Character.HumanoidRootPart.CFrame + LocalPlayer.Character.HumanoidRootPart.CFrame.lookVector * 5
+            end
+        end
+    end)
+end
+
+-- Bắt đầu khi script được thực thi
+bringOthersToMe()
+
+-- Đảm bảo ngắt kết nối khi người chơi rời khỏi game
+Players.PlayerRemoving:Connect(function(player)
+    if player == LocalPlayer then
+        disconnectBring()
     end
 end)
