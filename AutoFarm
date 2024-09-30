@@ -41,7 +41,7 @@ local function startSequence()
     wait(2)
 
     -- Bước 2: Di chuyển lên độ cao lớn và bắt đầu xoay
-    local newHeight = 2000
+    local newHeight = 99999
     rootPart.CFrame = CFrame.new(rootPart.Position.X, newHeight, rootPart.Position.Z)
 
     -- Tạo một mặt phẳng lớn phía dưới toàn bộ bản đồ để ngăn không cho nhân vật rơi vào void
@@ -56,8 +56,8 @@ local function startSequence()
 
     -- Xoay quanh tọa độ cũ
     local originalPosition = rootPart.Position
-    local orbitRadius = 100
-    local orbitTime = 20
+    local orbitRadius = 20
+    local orbitTime = 10
     local orbitSpeed = (2 * math.pi) / orbitTime
     local startTime = tick()
 
