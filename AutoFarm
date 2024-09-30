@@ -41,7 +41,7 @@ local function startSequence()
     wait(2)
 
     -- Bước 2: Di chuyển lên độ cao lớn và bắt đầu xoay
-    local newHeight = 99999
+    local newHeight = 20
     rootPart.CFrame = CFrame.new(rootPart.Position.X, newHeight, rootPart.Position.Z)
 
     -- Tạo một mặt phẳng lớn phía dưới toàn bộ bản đồ để ngăn không cho nhân vật rơi vào void
