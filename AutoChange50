@@ -1,10 +1,10 @@
---Services\\--
+
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local Players = game:GetService("Players")
 local LPlayer = Players.LocalPlayer
 
---//Variables\\--
+
 local Remotes = ReplicatedStorage.Remotes
 local StampAsset = Remotes.StampAsset
 local Plates = Workspace.Plates
